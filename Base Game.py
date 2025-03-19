@@ -1,17 +1,18 @@
 import random
 
 class Location:
-    def __init__(self, name, food_chance, items):
+    def __init__(self, name, food_chance, items, requires=None):
         self.name = name
         self.food_chance = food_chance  # Probability of finding food (0 to 1)
         self.items = items  # List of items that can be found here
         self.neighbors = {}  # Connected locations and their movement cost
+        self.requires = requires  # Item required to access this location
     
     def add_neighbor(self, neighbor, cost):
         self.neighbors[neighbor] = cost
     
     def search_for_food(self):
-        return random.random() < self.food_chance
+        return "Food" if random.random() < self.food_chance else None
     
     def search_for_items(self):
         return random.choice(self.items) if self.items else None
@@ -21,9 +22,14 @@ class Player:
         self.energy = 100
         self.inventory = []
         self.location = start_location
+        self.water_uses = 0  # Tracks water bottle uses
+        self.purified = False  # Tracks if water is purified
     
     def move(self, new_location):
         if new_location in self.location.neighbors:
+            if new_location.requires and new_location.requires not in self.inventory:
+                print(f"You need {new_location.requires} to enter {new_location.name}.")
+                return
             cost = self.location.neighbors[new_location]
             if self.energy >= cost:
                 self.energy -= cost
@@ -35,18 +41,53 @@ class Player:
             print("You can't move to that location!")
     
     def search(self):
-        if self.location.search_for_food():
-            self.energy += 20
-            print("You found food and ate it! Energy restored.")
+        food = self.location.search_for_food()
+        if food:
+            self.inventory.append("Food")
+            print("You found food and stored it in your inventory!")
         else:
             print("No food found here.")
         
         item = self.location.search_for_items()
         if item:
             self.inventory.append(item)
+            self.location.items.remove(item)
             print(f"You found a {item}!")
         else:
             print("No items found here.")
+    
+    def use_food(self):
+        if "Food" in self.inventory:
+            self.energy = min(100, self.energy + 20)
+            self.inventory.remove("Food")
+            print("You ate some food and restored energy!")
+        else:
+            print("You have no food to eat.")
+    
+    def fill_water_bottle(self):
+        if "Water Bottle" in self.inventory and self.location.name == "Lake":
+            self.water_uses = 3
+            self.purified = False
+            print("You filled your water bottle with untreated water.")
+        else:
+            print("You need a water bottle and must be at the lake to fill it.")
+    
+    def drink_water(self):
+        if self.water_uses > 0:
+            self.water_uses -= 1
+            print("You drank water.")
+            if not self.purified and random.random() < 0.1:
+                print("You got sick from drinking untreated water! Energy -20.")
+                self.energy = max(0, self.energy - 20)
+        else:
+            print("Your water bottle is empty.")
+    
+    def purify_water(self):
+        if "Water Bottle" in self.inventory and "Torch" in self.inventory:
+            self.purified = True
+            print("You used the torch to purify your water. It is now safe to drink!")
+        else:
+            print("You need a water bottle and a torch to purify water.")
     
     def show_inventory(self):
         if self.inventory:
@@ -58,27 +99,23 @@ class Player:
     
     def check_energy(self):
         print(f"Current Energy: {self.energy}/100")
-    
-    def gather_resources(self):
-        if self.energy > 10:
-            print("You gathered some wood and berries.")
-            self.inventory.append("Wood")
-            self.inventory.append("Berries")
-            self.energy -= 10
-        else:
-            print("Not enough energy to gather resources. Rest to regain energy.")
 
 def create_map():
-    forest = Location("Forest", 0.5, ["Stick", "Berries"])
-    cave = Location("Cave", 0.2, ["Rock", "Torch"])
-    lake = Location("Lake", 0.8, ["Fish", "Water Bottle"])
+    crash_site = Location("Crash Site", 0.6, ["Flashlight", "Locked Box"])
+    forest = Location("Dense Forest", 0.5, ["Stick"])
+    cave = Location("Cave", 0.2, ["Knife"], requires="Flashlight")
+    lake = Location("Lake", 0.8, ["Water Bottle"])
+    mountain = Location("Mountain", 0.1, [], requires="Climbing Gear")
     
+    crash_site.add_neighbor(forest, 10)
     forest.add_neighbor(cave, 20)
-    forest.add_neighbor(lake, 10)
+    forest.add_neighbor(lake, 15)
+    forest.add_neighbor(mountain, 30)
     cave.add_neighbor(forest, 20)
-    lake.add_neighbor(forest, 10)
+    lake.add_neighbor(forest, 15)
+    mountain.add_neighbor(forest, 30)
     
-    return forest  # Starting location
+    return crash_site  # Starting location
 
 class Game:
     def __init__(self):
@@ -89,12 +126,18 @@ class Game:
         print("\n--- Survival Game Menu ---")
         print("1. Move to another location")
         print("2. Search for food and items")
-        print("3. View Inventory")
-        print("4. Check Energy")
-        print("5. Gather Resources")
-        print("6. Exit Game")
+        print("3. Eat Food")
+        print("4. Fill Water Bottle")
+        print("5. Drink Water")
+        print("6. Purify Water")
+        print("7. View Inventory")
+        print("8. Check Energy")
+        print("9. Exit Game")
     
     def run(self):
+        print("You wake up in the wreckage of a plane crash, deep in the forest. You are the only survivor.")
+        print("Your goal is to escape by finding the necessary tools and reaching civilization.")
+        
         while self.running and self.player.energy > 0:
             print(f"\nCurrent location: {self.player.location.name}")
             print("Available moves:")
@@ -115,12 +158,18 @@ class Game:
             elif choice == "2":
                 self.player.search()
             elif choice == "3":
-                self.player.show_inventory()
+                self.player.use_food()
             elif choice == "4":
-                self.player.check_energy()
+                self.player.fill_water_bottle()
             elif choice == "5":
-                self.player.gather_resources()
+                self.player.drink_water()
             elif choice == "6":
+                self.player.purify_water()
+            elif choice == "7":
+                self.player.show_inventory()
+            elif choice == "8":
+                self.player.check_energy()
+            elif choice == "9":
                 print("Exiting game...")
                 self.running = False
             else:
