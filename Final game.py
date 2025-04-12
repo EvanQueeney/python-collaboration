@@ -169,7 +169,11 @@ class Player:
         elif item == "water bottle":#the water bottle is able to be filled at the lake then purified at the campfire to drink
             if self.location.name == "Lake":
                 fancy_prent("You filled the water bottle with lake water. It needs to be purified before drinking.")
+                self.water_uses=3
                 self.purified = False
+            elif self.location.name == "Clearing" and self.location.has_campfire and self.water_uses > 0 and not self.purified:
+                fancy_prent("You purify the lake water at the campfire. It is now safe to drink.")
+                self.purified = True
             elif self.water_uses > 0 and self.purified:#checks if the water is purified
                 self.energy += 20
                 self.water_uses -= 1
@@ -278,7 +282,7 @@ class Game:
         if self.player.rescued:#if the player has been rescued end the game
             fancy_prent("Game Over! You have been rescued.")
         else:
-            fancy_prent("Game Over! You ran out of energy.")
+            fancy_prent("Game Over!")
 
 game = Game()
 game.run()
